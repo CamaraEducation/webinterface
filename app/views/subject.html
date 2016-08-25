@@ -1,0 +1,7 @@
+<div class="row marketing">
+  <div class="well">
+    <h3>Resources for {{current_subject.name}}</h4>
+    <hr/>
+    <a class="btn btn-row" ng-repeat="resource in subject_software" href="#/resource/{{resource.name}}"><img ng-src="images/app_icons/{{resource.icon}}"/><p>{{resource.name}}</p></a>
+  </div>
+</div>

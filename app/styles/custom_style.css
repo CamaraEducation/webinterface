@@ -1,0 +1,173 @@
+html, body, div, span, object,
+h1, h2, h3, h4, h5, h6,
+p, a, ol, ul, li, label, legend {
+	margin: 0;
+	padding: 0;
+	border: 0;
+	outline: 0;
+	background: transparent;
+	font-size: 100%;
+	vertical-align: baseline;
+}
+
+* {
+	-webkit-box-sizing: border-box;
+	-moz-box-sizing: border-box;
+	box-sizing: border-box;
+}
+
+body {
+	color: #666;
+	background-color: #424242;
+	font-family: "Open Sans", Arial, sans-serif;
+	font-size: 14px;
+	font-weight: 500;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	line-height: 1.7em;
+}
+
+.container {
+  position: relative;
+  width: 80%;
+  max-width: 1080px;
+  margin: auto;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  padding-bottom: 10px;
+  color: #333;
+  font-weight: 500;
+  line-height: 1em;
+}
+
+h2 {
+  font-size: 26px;
+	color: #82bc00;
+}
+
+h3 {
+  font-size: 20px;
+}
+
+.jumbotron p {
+	color: #bbbbbb;
+  margin-bottom: 15px;
+  font-size: 21px;
+  font-weight: 200;
+}
+
+.jumbotron {
+	background-color: #111111;
+}
+
+.well h1, .well h2, .well h3, .well h4{
+  padding-top: 10px;
+  color: #82bc00;
+}
+
+.well p {
+  color: #bbbbbb;
+  margin-bottom: 15px;
+  font-size: 21px;
+  font-weight: 200;
+}
+
+.well hr{
+	border-color: #5e5e5e
+}
+
+.well {
+  background-color: #111111;
+  border: none;
+  overflow: auto;
+}
+
+.jumbotron h1, .jumbotron h2,
+.jumbotron h3, .jumbotron h4{
+  color: #82bc00;
+}
+
+.navbar-default, .navbar-brand{
+  background-color: #111111;
+  border-color: #666666;
+  color: #ffffff;
+}
+
+.navbar-default .navbar-brand:hover,
+.navbar-default .navbar-brand:focus{
+	color: #bbbbbb;
+}
+
+.navbar-default .navbar-brand{
+	color: #ffffff;
+}
+
+.navbar-default .navbar-nav > li > a{
+	color: #bbbbbb;
+}
+
+.navbar-default .navbar-nav > li > a:hover,
+.navbar-default .navbar-nav > li > a:focus{
+	color: #5e5e5e;
+}
+
+.header{
+	border-bottom: none;
+}
+
+.footer{
+	border-top: none;
+}
+
+.btn-row {
+  display: inline-block;
+}
+
+img.screenshot {
+  display: inline-block;
+  width: 400px;
+  height: auto;
+  padding-bottom: 15px;
+	padding-left: 20px;
+  float: right;
+}
+
+.aside {
+  padding-right: 30px;
+}
+
+.header-image {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+.logo-navbar {
+	padding: 5px;
+}
+
+.btn-camara {
+	background-color: #82bc00;
+	color: #111111;
+	padding-bottom: 7px;
+}
+
+.cam-search {
+	color: #bbbbbb;
+	font-size: 20px;
+	line-height: 1.42857143;
+}
+
+.cam-search input{
+	color: #333333;
+  border: 2px solid #dadada;
+  border-radius: 4px;
+	vertical-align: middle;
+}
+
+.cam-search input:focus {
+  outline: none;
+	border-radius: 4px;
+  border-color: #82bc00;
+  box-shadow: 0 0 5px #82bc00;
+}
