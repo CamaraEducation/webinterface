@@ -1,0 +1,21 @@
+<div class="jumbotron">
+  <h2>Welcome to the Camara Resource Compendium</h2>
+  <p>
+    <img src="images/interface_icons/Symbolsmall.png" alt="Camara"><br>
+    Information on all educational resources is compiled here.
+  </p>
+</div>
+
+<div class="row marketing">
+  <div class="well">
+    <h3>Resources by subject:</h3>
+    <hr/>
+    <a class="btn btn-row" ng-repeat="subject in subject_list" href="#/subject/{{subject.name}}"><img ng-src="images/interface_icons/{{subject.icon}}"/><p>{{subject.name}}</p></a>
+  </div>
+
+  <div class="well">
+    <h3>Resources by age range:</h3>
+    <hr/>
+    <a class="btn btn-row" ng-repeat="level in level_list" href="#/level/{{level.name}}"><img ng-src="images/interface_icons/{{level.icon}}"/><p>{{level.name}}</p></a>
+  </div>
+</div>
