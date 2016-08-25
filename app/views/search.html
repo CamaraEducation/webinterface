@@ -1,3 +1,12 @@
 <div class="well">
-  <p>Search:</p>
+  <form class="cam-search">
+    Search Resources:
+    <input type="search" name="Search" ng-model="resSearch.searchVal">
+    <button type="submit" class="btn btn-camara" ng-click="resSearch.SearchResources();">
+      <b>&#128269;</b>
+    </button>
+  </form>
+</div>
+<div class="well" ng-if="resSearch.searchResults.length>0">
+  <a class="btn btn-row" ng-repeat="resource in resSearch.searchResults" href="#/resource/{{resource.name}}"><img ng-src="images/app_icons/{{resource.icon}}"/><p>{{resource.name}}</p></a>
 </div>

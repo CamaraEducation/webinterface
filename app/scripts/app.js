@@ -24,9 +24,9 @@ angular
         controller: 'MainCtrl',
         controllerAs: 'main'
       })
-      .when('/about', {
-        templateUrl: 'views/about.html',
-        controller: 'AboutCtrl',
+      .when('/search', {
+        templateUrl: 'views/search.html',
+        controller: 'SearchCtrl',
         controllerAs: 'resSearch'
       })
       .when('/subject/:subject_param', {
