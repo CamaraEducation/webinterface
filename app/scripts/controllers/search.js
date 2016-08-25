@@ -8,12 +8,14 @@ angular.module('interfaceApp')
 
     this.searchVal = '';
     this.searchResults = [];
+    this.searchedYet = false;
 
     this.SearchResources = function () {
+      this.searchedYet = true;
+      this.searchResults = [];
       if(this.searchVal.length < 1){
         return;
       }
-      this.searchResults = [];
       for(var i in $scope.resources){
         if($scope.resources[i].description.toLowerCase().indexOf(this.searchVal.toLowerCase()) !== -1){
           this.searchResults.push($scope.resources[i]);
