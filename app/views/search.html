@@ -7,6 +7,7 @@
     </button>
   </form>
 </div>
-<div class="well" ng-if="resSearch.searchResults.length>0">
+<div class="well" ng-if="resSearch.searchedYet">
+  <p ng-if="resSearch.searchResults.length==0 && resSearch.searchedYet">No Results Found</p>
   <a class="btn btn-row" ng-repeat="resource in resSearch.searchResults" href="#/resource/{{resource.name}}"><img ng-src="images/app_icons/{{resource.icon}}"/><p>{{resource.name}}</p></a>
 </div>
