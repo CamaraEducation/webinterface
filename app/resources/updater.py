@@ -10,13 +10,45 @@ import math
 name_lists = {"resource": [], "subject": []}
 subject_name_list = []
 
-image_dir = "./images"
+image_dir = "../images"
 
 edit_or_delete = None
 
 res_or_sub = "resource"
 
 education_levels = ["Primary", "Secondary", "Tertiary"]
+
+file_locations = []
+other_image_dir = None
+
+class PasswordDialog(Toplevel):
+    def __init__(self, parent):
+        Toplevel.__init__(self)
+        self.parent = parent
+        self.parent.password = ""
+        container = Frame(self)
+        container.grid_rowconfigure(0, weight=1)
+        container.grid_columnconfigure(0, weight=1)
+
+        if self.parent.password_success:
+            Label(self, text="Password incorrect.", fg="red", justify=LEFT).grid(row=0, column=0, columnspan=2, padx=10, pady=10)
+        self.parent.password_success = False
+
+        Label(self, text="The CamaraAdmin password is required to save changes to the Camara Resource Compendium.", wraplength=220, justify=LEFT).grid(row=1, column=0, columnspan=2, padx=10, pady=10)
+        Label(self, text="Password:").grid(row=2, column=0, padx=(10, 5), pady=10)
+        self.entry = Entry(self, show='*')
+        self.entry.bind("<KeyRelease-Return>", self.StorePassEvent)
+        self.entry.grid(row=2, column=1, padx=(0, 10), pady=10)
+        self.button = Button(self, text="Submit", command=self.StorePass)
+        self.button.grid(row=3, column=1, padx=(0, 5), pady=10, sticky=E)
+
+    def StorePassEvent(self, event):
+        self.StorePass()
+
+    def StorePass(self):
+        self.parent.password = self.entry.get()
+        self.parent.password_success = True
+        self.destroy()
 
 class UpdaterApp(Tk):
 
@@ -30,10 +62,24 @@ class UpdaterApp(Tk):
         chosen_indices = {"resource": None, "subject": None}
 
         global resource_list_file
-        resource_list_file = open("software_list.json", "r+")
+        resource_list_file = open("software_list.json", "r")
 
         global resource_list_data
         resource_list_data = json.load(resource_list_file)
+
+        resource_list_file.close()
+
+        global file_locations
+        global other_image_dir
+        current_dir = os.getcwd()
+        file_locations.append("./software_list.json")
+        if "camaraadmin" in current_dir:
+            if os.path.exists(current_dir.replace("camaraadmin", "camara")):
+                file_locations.append(current_dir.replace("camaraadmin", "camara") + "/software_list.json")
+                other_image_dir = current_dir.replace("camaraadmin", "camara") + "/../images"
+        elif os.path.exists(current_dir.replace("camara", "camaraadmin")):
+            file_locations.append(current_dir.replace("camara", "camaraadmin") + "/software_list.json")
+            other_image_dir = current_dir.replace("camara", "camaraadmin") + "/../images"
 
         container = Frame(self)
 
@@ -363,12 +409,16 @@ class AddOrEditResource(Frame):
             for level in chosen_items["resource"][u'level']:
                 self.level_checkboxes[education_levels.index(str(level))].select()
 
+    def GetPassword(self):
+        self.wait_window(PasswordDialog(self))
+
     def save_changes(self, controller):
         global name_lists
         global resource_list_data
-        global resource_list_file
         global chosen_items
         global chosen_indices
+        global file_locations
+        global other_image_dir
 
         name = self.name_box.get().lstrip()
 
@@ -379,6 +429,17 @@ class AddOrEditResource(Frame):
             if u'name' not in chosen_items["resource"] or name != chosen_items["resource"][u'name']:
                 tkMessageBox.showerror("ALERT", "A resource with that name already exists")
                 return
+
+        correct_password = False
+        self.password_success = False
+
+        while not correct_password:
+            self.GetPassword()
+            if not self.password_success:
+                return
+            res = os.system('echo %s | sudo -S -v' %(self.password))
+            if res == 0:
+                correct_password = True
 
         if chosen_indices["resource"] is not None:
             name_lists["resource"][name_lists["resource"].index(str(chosen_items["resource"][u'name']))] = name
@@ -391,10 +452,17 @@ class AddOrEditResource(Frame):
 
         for im_type in ["icon", "screenshot"]:
             if self.new_image_filenames[im_type]:
+                im_location = image_dir+"/app_"+im_type+"s/"
+                if other_image_dir is not None:
+                    other_im_location = other_image_dir+"/app_"+im_type+"s/"
                 if unicode(im_type) in chosen_items["resource"] and (str(chosen_items["resource"][unicode(im_type)]) != ("no_"+im_type+".png")):
-                    os.remove(image_dir+"/app_"+im_type+"s/"+str(chosen_items["resource"][unicode(im_type)]))
+                    os.remove(im_location+str(chosen_items["resource"][unicode(im_type)]))
+                    if other_image_dir is not None:
+                        os.system('echo %s | sudo -S %s ' %(self.password, "rm "+other_im_location+str(chosen_items["resource"][unicode(im_type)])))
                 chosen_items["resource"][unicode(im_type)] = unicode(self.new_image_filenames[im_type])
-                self.new_image_filenames[im_type] = None
+                if other_image_dir is not None:
+                    os.system('echo %s | sudo -S %s ' %(self.password, "cp "+im_location+self.new_image_filenames[im_type]+" "+other_im_location+self.new_image_filenames[im_type]))
+                    self.new_image_filenames[im_type] = None
             else:
                 if not unicode(im_type) in chosen_items["resource"]:
                     chosen_items["resource"][unicode(im_type)] =unicode("no_"+im_type+".png")
@@ -413,9 +481,21 @@ class AddOrEditResource(Frame):
         else:
             resource_list_data[u'resources'].append(chosen_items["resource"])
 
-        resource_list_file.seek(0)
-        resource_list_file.truncate()
-        json.dump(resource_list_data, resource_list_file, indent=2)
+        temp_file = open("./temp_software_list.json", "w")
+        json.dump(resource_list_data, temp_file, indent=2)
+        temp_file.close()
+
+        saved = False
+        file_results = 0
+        for file_loc in file_locations:
+            file_results += os.system('echo %s | sudo -S %s ' %(self.password, "cp ./temp_software_list.json "+file_loc))
+        if file_results == 0:
+            saved = True
+        os.system('sudo -K')
+
+        if not saved:
+            tkMessageBox.showerror("ALERT", "Error occurred when saving.")
+            return
 
         message = ""
         if chosen_indices["resource"] is not None:
@@ -529,12 +609,15 @@ class AddOrEditSubject(Frame):
             new_image = PhotoImage(file=(im_subdir+self.new_image_filename))
             self.set_icon(new_image)
 
+    def GetPassword(self):
+        self.wait_window(PasswordDialog(self))
+
     def save_changes(self, controller):
         global name_lists
         global resource_list_data
-        global resource_list_file
         global chosen_items
         global chosen_indices
+        global other_image_dir
 
         name = self.name_entry_box.get().lstrip().title()
 
@@ -546,6 +629,17 @@ class AddOrEditSubject(Frame):
                 tkMessageBox.showerror("ALERT", "A subject with that name already exists")
                 return
 
+        correct_password = False
+        self.password_success = False
+
+        while not correct_password:
+            self.GetPassword()
+            if not self.password_success:
+                return
+            res = os.system('echo %s | sudo -S -v' %(self.password))
+            if res == 0:
+                correct_password = True
+
         if chosen_indices["subject"] is not None:
             name_lists["subject"][name_lists["subject"].index(str(chosen_items["subject"][u'name']))] = name
         else:
@@ -556,9 +650,16 @@ class AddOrEditSubject(Frame):
         chosen_items["subject"][u'name'] = unicode(name)
 
         if self.new_image_filename:
+            im_location = image_dir+"/interface_icons/"
+            if other_image_dir is not None:
+                other_im_location = other_image_dir+"/interface_icons/"
             if u'icon' in chosen_items["subject"] and (str(chosen_items["subject"][u'icon']) != ("Symbolsmall.png")):
-                os.remove(image_dir+"/interface_icons/"+str(chosen_items["subject"][u'icon']))
+                os.remove(im_location+str(chosen_items["subject"][u'icon']))
+                if other_image_dir is not None:
+                    os.system('echo %s | sudo -S %s ' %(self.password, "rm "+other_im_location+str(chosen_items["resource"][u'icon'])))
             chosen_items["subject"][u'icon'] = unicode(self.new_image_filename)
+            if other_image_dir is not None:
+                os.system('echo %s | sudo -S %s ' %(self.password, "cp "+im_location+self.new_image_filename+" "+other_im_location+self.new_image_filename))
             self.new_image_filename = None
         else:
             if not u'icon' in chosen_items["subject"]:
@@ -569,9 +670,21 @@ class AddOrEditSubject(Frame):
         else:
             resource_list_data[u'subjects'].append(chosen_items["subject"])
 
-        resource_list_file.seek(0)
-        resource_list_file.truncate()
-        json.dump(resource_list_data, resource_list_file, indent=2)
+        temp_file = open("./temp_software_list.json", "w")
+        json.dump(resource_list_data, temp_file, indent=2)
+        temp_file.close()
+
+        saved = False
+        file_results = 0
+        for file_loc in file_locations:
+            file_results += os.system('echo %s | sudo -S %s ' %(self.password, "cp ./temp_software_list.json "+file_loc))
+        if file_results == 0:
+            saved = True
+        os.system('sudo -K')
+
+        if not saved:
+            tkMessageBox.showerror("ALERT", "Error occurred when saving.")
+            return
 
         message = ""
         if chosen_indices["subject"] is not None:
@@ -592,8 +705,7 @@ class AddOrEditSubject(Frame):
 root = UpdaterApp()
 
 def on_closing():
-    global resource_list_file
-    resource_list_file.close()
+    os.remove("./temp_software_list.json")
     print("Closed!")
     root.destroy()
 
