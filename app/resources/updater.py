@@ -1,12 +1,13 @@
-from Tkinter import *
-import ttk
-import json
-import tkMessageBox
-import tkFileDialog
-import shutil
-import os
-import math
+from Tkinter import *       #GUI module
+import ttk                  #Themed widget module
+import json                 #Module for handling json files & data
+import tkMessageBox         #Module for simple message box
+import tkFileDialog         #Module for dialog for choosing files on computer. Used for choosing new images
+import shutil               #Module for high-level file operations. Only used in about two places, could be removed
+import os                   #Module for os interfacing
+import math                 #You don't need me to tell you what this is for
 
+#Setting up some global variables
 name_lists = {"resource": [], "subject": []}
 subject_name_list = []
 
@@ -21,6 +22,10 @@ education_levels = ["Primary", "Secondary", "Tertiary"]
 file_locations = []
 other_image_dir = None
 
+chosen_items = {"resource": {}, "subject": {}}
+chosen_indices = {"resource": None, "subject": None}
+
+#Class to handle a password dialog, which is needed for saving changes.
 class PasswordDialog(Toplevel):
     def __init__(self, parent):
         Toplevel.__init__(self)
@@ -30,6 +35,7 @@ class PasswordDialog(Toplevel):
         container.grid_rowconfigure(0, weight=1)
         container.grid_columnconfigure(0, weight=1)
 
+        #If a password was entered previously, but they're back here, let the user know the password was wrong
         if self.parent.password_success:
             Label(self, text="Password incorrect.", fg="red", justify=LEFT).grid(row=0, column=0, columnspan=2, padx=10, pady=10)
         self.parent.password_success = False
@@ -41,6 +47,7 @@ class PasswordDialog(Toplevel):
         self.entry.grid(row=2, column=1, padx=(0, 10), pady=10)
         self.button = Button(self, text="Submit", command=self.StorePass)
         self.button.grid(row=3, column=1, padx=(0, 5), pady=10, sticky=E)
+        Button(self, text="Cancel", command=self.destroy).grid(row=3, column=0, padx=(5,0), pady=10, sticky=E)
 
     def StorePassEvent(self, event):
         self.StorePass()
@@ -55,20 +62,16 @@ class UpdaterApp(Tk):
     def __init__(self, *args, **kwargs):
 
         Tk.__init__(self, *args, **kwargs)
-
-        global chosen_items
-        chosen_items = {"resource": {}, "subject": {}}
-        global chosen_indices
-        chosen_indices = {"resource": None, "subject": None}
-
+        #Get the current file
         global resource_list_file
         resource_list_file = open("software_list.json", "r")
-
+        #Get the current data
         global resource_list_data
         resource_list_data = json.load(resource_list_file)
 
         resource_list_file.close()
 
+        #Need to make sure that if this is on both the camara and camaraadmin accounts that both are updated
         global file_locations
         global other_image_dir
         current_dir = os.getcwd()
@@ -81,6 +84,8 @@ class UpdaterApp(Tk):
             file_locations.append(current_dir.replace("camara", "camaraadmin") + "/software_list.json")
             other_image_dir = current_dir.replace("camara", "camaraadmin") + "/../images"
 
+
+        #Setting up the different frames of the application
         container = Frame(self)
 
         container.pack(side="top", fill="both", expand = True)
@@ -100,18 +105,20 @@ class UpdaterApp(Tk):
 
         self.show_frame(FrontPage)
 
+    #Change what's on top
     def show_frame(self, cont):
-
         frame = self.frames[cont]
         frame.tkraise()
         frame.event_generate("<<ShowFrame>>")
 
+    #Handle closing the application. Delete the temp file if it was created
     def close_updater(self):
-        global resource_list_file
-        resource_list_file.close()
+        if os.path.exists("./temp_software_list.json"):
+            os.remove("./temp_software_list.json")
         print("Closed!")
         self.quit();
 
+#Landing page of the application
 class FrontPage(Frame):
     def __init__(self, parent, controller):
         Frame.__init__(self, parent)
@@ -119,48 +126,42 @@ class FrontPage(Frame):
         label = Label(self, text="What do you want to change?")
         label.pack()
 
-        edit_resource_button = Button(self, text="Edit Resource", command=lambda: self.edit_or_delete_resource_router(controller, "edit"))
+        #Buttons for the various options
+        edit_resource_button = Button(self, text="Edit Resource", command=lambda: self.edit_or_delete_router(controller, "edit", "resource"))
         edit_resource_button.pack()
 
         add_resource_button = Button(self, text="Add Resource", command=lambda: controller.show_frame(AddOrEditResource))
         add_resource_button.pack()
 
-        remove_resource_button = Button(self, text="Remove Resource", command=lambda: self.edit_or_delete_resource_router(controller, "delete"))
+        remove_resource_button = Button(self, text="Remove Resource", command=lambda: self.edit_or_delete_router(controller, "delete", "resource"))
         remove_resource_button.pack()
 
-        edit_subject_button = Button(self, text="Edit Subject", command=lambda: self.edit_or_delete_subject_router(controller, "edit"))
+        edit_subject_button = Button(self, text="Edit Subject", command=lambda: self.edit_or_delete_router(controller, "edit", "subject"))
         edit_subject_button.pack()
 
         add_subject_button = Button(self, text="Add Subject", command=lambda: controller.show_frame(AddOrEditSubject))
         add_subject_button.pack()
 
-        remove_subject_button = Button(self, text="Remove Subject", command=lambda: self.edit_or_delete_subject_router(controller, "delete"))
+        remove_subject_button = Button(self, text="Remove Subject", command=lambda: self.edit_or_delete_router(controller, "delete", "subject"))
         remove_subject_button.pack()
 
         close_button = Button(self, text="Close", command=controller.close_updater)
         close_button.pack()
 
-    def edit_or_delete_resource_router(self, controller, route):
+    #Gathers some info for the next frame
+    def edit_or_delete_router(self, controller, route, resource_or_subject):
         global edit_or_delete
         edit_or_delete = route
         global res_or_sub
-        res_or_sub = "resource"
+        res_or_sub = resource_or_subject
         controller.show_frame(ChooseItem)
 
-    def add_resource(self):
-        print("Resource added")
-
-    def edit_or_delete_subject_router(self, controller, route):
-        global edit_or_delete
-        edit_or_delete = route
-        global res_or_sub
-        res_or_sub = "subject"
-        controller.show_frame(ChooseItem)
-
+#Choose the subject/resource for editing/deletion
 class ChooseItem(Frame):
     def __init__(self, parent, controller):
         Frame.__init__(self, parent)
 
+        #When the frame is displayed, the 'on_show_frame' event handler sets up the appropriate info
         self.bind("<<ShowFrame>>", lambda event, arg=controller: self.on_show_frame(event, arg))
 
         self.dropdown_label = Label(self, text="Resource:")
@@ -174,12 +175,15 @@ class ChooseItem(Frame):
 
         self.edit_or_delete_resource_button = None
 
+    #Once an item has been selected, this handles what needs to be done
     def edit_or_delete_resource_action(self, controller, selected_item, res_or_sub):
+        #Global variables for gleaning and setting info
         global edit_or_delete
         global chosen_items
         chosen_items[res_or_sub] = {}
         global chosen_indices
         chosen_indices[res_or_sub] = None
+        #Search through the resource and subject data to find the item in question
         for index, curr_resource in enumerate(resource_list_data[unicode(res_or_sub+"s")]):
             if curr_resource[u'name'] == unicode(selected_item):
                 chosen_items[res_or_sub] = curr_resource
@@ -187,24 +191,51 @@ class ChooseItem(Frame):
                 break
 
         if(chosen_items[res_or_sub]):
+            #Clear the dropdown selection
             self.selection_dropdown.set("")
+            #Choose the correct edit frame
             if edit_or_delete == "edit":
                 edit_or_delete = None
                 if res_or_sub == "resource":
                     controller.show_frame(AddOrEditResource)
                 elif res_or_sub == "subject":
                     controller.show_frame(AddOrEditSubject)
+            #Handle deleting the item
             elif edit_or_delete == "delete":
-                edit_or_delete = None
                 response = tkMessageBox.askokcancel("Delete "+res_or_sub.title(), ("Are you sure you want to delete "+selected_item+"?"), default=tkMessageBox.CANCEL)
                 if response:
+                    correct_password = False
+                    self.password_success = False
+
+                    while not correct_password:
+                        self.wait_window(PasswordDialog(self))
+                        if not self.password_success:
+                            return
+                        res = os.system('echo %s | sudo -S -v' %(self.password))
+                        if res == 0:
+                            correct_password = True
+
                     resource_list_data[unicode(res_or_sub+"s")].pop(chosen_indices[res_or_sub])
-                    resource_list_file.seek(0)
-                    resource_list_file.truncate()
-                    json.dump(resource_list_data, resource_list_file, indent=2)
+                    temp_file.open("./temp_software_list.json", "w")
+                    json.dump(resource_list_data, temp_file, indent=2)
+                    temp_file.close()
+
+                    saved = False
+                    file_results = 0
+                    global file_locations
+                    for file_loc in file_locations:
+                        file_results += os.system('echo %s | sudo -S %s ' %(self.password, "cp ./temp_software_list.json "+file_loc))
+                    if file_results == 0:
+                        saved = True
+                    os.system('sudo -K')
+
+                    if not saved:
+                        tkMessageBox.showerror("ALERT", "Error occurred while saving changes.")
+
                     name_lists[res_or_sub].remove(selected_item)
                     chosen_items[res_or_sub] = {}
                     chosen_indices[res_or_sub] = None
+                    edit_or_delete = None
                     controller.show_frame(FrontPage)
         else:
             tkMessageBox.showwarning("Alert", res_or_sub.title()+" not found")
@@ -705,7 +736,8 @@ class AddOrEditSubject(Frame):
 root = UpdaterApp()
 
 def on_closing():
-    os.remove("./temp_software_list.json")
+    if os.path.exists("./temp_software_list.json"):
+        os.remove("./temp_software_list.json")
     print("Closed!")
     root.destroy()
 
