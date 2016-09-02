@@ -1,3 +1,6 @@
+/*
+Controller to handle the Level view. Quite simple, just populates the lists of subjects for each educational level
+*/
 'use strict';
 
 angular.module('interfaceApp')
@@ -7,9 +10,10 @@ angular.module('interfaceApp')
   $scope.current_level.name = $routeParams.level_param;
   $scope.level_software = {};
 
+  //Get the resource & subject data
   DataService.getSharedData().then(function(response){
     $scope.level_list = response.levels;
-
+    //Sort the subject into the levels that contain resources for that subject
     for(var i in response.resources){
       if(response.resources[i].level.indexOf($scope.current_level.name) >= 0){
         if(!$scope.level_software.hasOwnProperty(response.resources[i].category)){

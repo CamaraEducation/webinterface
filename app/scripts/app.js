@@ -8,6 +8,10 @@
  *
  * Main module of the application.
  */
+ /*
+This basically just stores the modules used in the app and the routing information
+Also stores info on what controller is stored where and which view it's needed for
+ */
 angular
   .module('interfaceApp', [
     'ngAnimate',

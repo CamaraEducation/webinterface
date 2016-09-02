@@ -1,3 +1,7 @@
+/*
+Styling should be done in here. Styles should never be specified in the html.
+Please consult the Camara Style Guide before changing the styling of the Resource Compendium.
+*/
 html, body, div, span, object,
 h1, h2, h3, h4, h5, h6,
 p, a, ol, ul, li, label, legend {
@@ -17,10 +21,10 @@ p, a, ol, ul, li, label, legend {
 }
 
 body {
-	color: #666;
+	color: #aaa;
 	background-color: #424242;
 	font-family: "Open Sans", Arial, sans-serif;
-	font-size: 14px;
+	font-size: 18px;
 	font-weight: 500;
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
