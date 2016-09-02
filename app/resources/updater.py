@@ -19,7 +19,7 @@ res_or_sub = "resource"
 
 education_levels = ["Primary", "Secondary", "Tertiary"]
 
-file_locations = []
+other_file_location = None
 other_image_dir = None
 
 chosen_items = {"resource": {}, "subject": {}}
@@ -72,18 +72,16 @@ class UpdaterApp(Tk):
         resource_list_file.close()
 
         #Need to make sure that if this is on both the camara and camaraadmin accounts that both are updated
-        global file_locations
+        global other_file_location
         global other_image_dir
         current_dir = os.getcwd()
-        file_locations.append("./software_list.json")
         if "camaraadmin" in current_dir:
             if os.path.exists(current_dir.replace("camaraadmin", "camara")):
-                file_locations.append(current_dir.replace("camaraadmin", "camara") + "/software_list.json")
+                other_file_location = current_dir.replace("camaraadmin", "camara") + "/software_list.json"
                 other_image_dir = current_dir.replace("camaraadmin", "camara") + "/../images"
         elif os.path.exists(current_dir.replace("camara", "camaraadmin")):
-            file_locations.append(current_dir.replace("camara", "camaraadmin") + "/software_list.json")
             other_image_dir = current_dir.replace("camara", "camaraadmin") + "/../images"
-
+            other_file_location = current_dir.replace("camara", "camaraadmin") + "/software_list.json"
 
         #Setting up the different frames of the application
         container = Frame(self)
@@ -111,11 +109,8 @@ class UpdaterApp(Tk):
         frame.tkraise()
         frame.event_generate("<<ShowFrame>>")
 
-    #Handle closing the application. Delete the temp file if it was created
+    #Handle closing the application.
     def close_updater(self):
-        if os.path.exists("./temp_software_list.json"):
-            os.remove("./temp_software_list.json")
-        print("Closed!")
         self.quit();
 
 #Landing page of the application
@@ -201,9 +196,13 @@ class ChooseItem(Frame):
                 elif res_or_sub == "subject":
                     controller.show_frame(AddOrEditSubject)
             #Handle deleting the item
+            #Todo: it would be nice to add here a warning when deleting a subject if resources list that subject as their category
+            #Todo: if the subject/resource has its own (non-default) image, the image ought to be removed
             elif edit_or_delete == "delete":
+                #Always good to ask for confirmation before deleting
                 response = tkMessageBox.askokcancel("Delete "+res_or_sub.title(), ("Are you sure you want to delete "+selected_item+"?"), default=tkMessageBox.CANCEL)
                 if response:
+                    #A user needs to have the admin password to delete a resource or subject
                     correct_password = False
                     self.password_success = False
 
@@ -211,28 +210,38 @@ class ChooseItem(Frame):
                         self.wait_window(PasswordDialog(self))
                         if not self.password_success:
                             return
+                        #This effectively acts as a check that the password is correct
                         res = os.system('echo %s | sudo -S -v' %(self.password))
                         if res == 0:
                             correct_password = True
 
+                    #Overwrite the file with the new data
                     resource_list_data[unicode(res_or_sub+"s")].pop(chosen_indices[res_or_sub])
-                    temp_file.open("./temp_software_list.json", "w")
-                    json.dump(resource_list_data, temp_file, indent=2)
-                    temp_file.close()
+                    resource_file = open("./software_list.json", "w")
+                    json.dump(resource_list_data, resource_file, indent=2)
+                    resource_file.close()
 
+                    #Copy the file to the other location
                     saved = False
-                    file_results = 0
-                    global file_locations
-                    for file_loc in file_locations:
-                        file_results += os.system('echo %s | sudo -S %s ' %(self.password, "cp ./temp_software_list.json "+file_loc))
-                    if file_results == 0:
+                    global other_file_location
+                    if other_file_location is not None:
+                        #Sudo is needed to copy to a different user's directory
+                        file_results = os.system('echo %s | sudo -S %s ' %(self.password, "cp ./software_list.json "+other_file_location))
+                        if file_results == 0:
+                            saved = True
+                    else:
                         saved = True
+                    #Clear the sudo permission and password
+                    self.password = ""
                     os.system('sudo -K')
 
                     if not saved:
                         tkMessageBox.showerror("ALERT", "Error occurred while saving changes.")
 
+                    #Keep the list of subjects/resources up-to-date
                     name_lists[res_or_sub].remove(selected_item)
+
+                    #Clear info
                     chosen_items[res_or_sub] = {}
                     chosen_indices[res_or_sub] = None
                     edit_or_delete = None
@@ -240,12 +249,14 @@ class ChooseItem(Frame):
         else:
             tkMessageBox.showwarning("Alert", res_or_sub.title()+" not found")
 
+    #Event handler to set up the Choose Item variables when Frame is shown
     def on_show_frame(self, event, controller):
         global res_or_sub
         global name_lists
 
         self.dropdown_label['text'] = res_or_sub.title()+":"
 
+        #If the list of resource/subject names has not get been created, populate it
         if not name_lists[res_or_sub]:
             global resource_list_data
             for r in resource_list_data[unicode(res_or_sub+"s")]:
@@ -256,6 +267,7 @@ class ChooseItem(Frame):
 
         global edit_or_delete
 
+        #Set the edit/delete button to have the correct text and functionality
         if self.edit_or_delete_resource_button:
             self.edit_or_delete_resource_button.grid_remove()
         if edit_or_delete == "edit":
@@ -268,17 +280,21 @@ class ChooseItem(Frame):
             edit_or_delete = None
             controller.show_frame(FrontPage)
 
+#Can handle both editing and creating a resource in the same frame
 class AddOrEditResource(Frame):
     global chosen_items
 
     def __init__(self, parent, controller):
         Frame.__init__(self, parent)
 
+        #Variables for images
         self.new_image_filenames = {"icon": None, "screenshot": None}
         self.full_screenshot = None
 
+        #Bind event handler for when frame is shown
         self.bind("<<ShowFrame>>", self.on_show_frame)
 
+        #Various widgets need to be added to the frame
         Label(self, text="Name:").grid(row=0, column=0, sticky=W)
 
         self.name_box = Entry(self)
@@ -324,6 +340,7 @@ class AddOrEditResource(Frame):
         self.save_button = Button(self, text="Save", command=lambda: self.save_changes(controller))
         self.save_button.grid(sticky=E, row=8, column=3)
 
+    #Screenshot is minimized to fit within the small frame, this pops it out to a new window
     def show_full_screenshot(self):
         top = Toplevel()
         top.title("Full-size screenshot")
@@ -334,23 +351,30 @@ class AddOrEditResource(Frame):
         self.full_screenshot = Label(top, image=self.original_screenshot)
         self.full_screenshot.pack()
 
+    #Handles setting up a new icon/screenshot image
+    #Moves the new image into the correct images subdirectory
     def set_new_image(self, im_type):
         im_subdir = image_dir + "/app_" + im_type + "s/"
+        #These are the only two types of image that tkinter can display
         image_filetypes = (
             ("PNG files", "*.png"),
             ("GIF files", "*.gif")
         );
         image_filepath = tkFileDialog.askopenfilename(title=("Select New "+im_type.title()), initialdir="/home/camaraadmin/Pictures", filetypes=image_filetypes)
         if image_filepath:
+            #If they've changed the image more than once before saving, the previous "new image" should be removed to keep the subdirectory as clean as possible
             if self.new_image_filenames[im_type]:
                 os.remove(im_subdir+self.new_image_filenames[im_type])
             self.new_image_filenames[im_type] = os.path.basename(image_filepath)
 
+            #Don't want to overwrite existing image with an image of the same name
+            #Todo: Ideally this should be replaced with a check to see if the subdirectory already contains an image with that name using os.path.exists or os.path.isfile
             if unicode(im_type) in chosen_items["resource"] and (self.new_image_filenames[im_type] == str(chosen_items["resource"][unicode(im_type)])):
                 self.new_image_filenames[im_type] = os.path.splitext(self.new_image_filenames[im_type])[0] + "0" + os.path.splitext(self.new_image_filenames[im_type])[1]
             if self.new_image_filenames[im_type] == "no_"+im_type+".png":
                 self.new_image_filenames[im_type] = os.path.splitext(self.new_image_filenames[im_type])[0] + "0" + os.path.splitext(self.new_image_filenames[im_type])[1]
 
+            #Todo: Could be done with os.system and a cp command instead. May be better, so shutil can be removed
             shutil.copyfile(image_filepath, (im_subdir+self.new_image_filenames[im_type]))
             new_image = PhotoImage(file=(im_subdir+self.new_image_filenames[im_type]))
             if im_type=="icon":
@@ -358,6 +382,7 @@ class AddOrEditResource(Frame):
             elif im_type=="screenshot":
                 self.set_screenshot(new_image)
 
+    #Handles setting a new icon
     def set_icon(self, icon_image):
         if self.image_label is not None:
             self.image_label.grid_remove()
@@ -366,6 +391,7 @@ class AddOrEditResource(Frame):
         self.image_label.image = icon_image
         self.image_label.grid(row=0, column=3, columnspan=2, rowspan=2)
 
+    #Handles setting a new screenshot
     def set_screenshot(self, screenshot_image):
         if self.screenshot_button is not None:
             self.screenshot_button.grid_remove()
@@ -377,6 +403,7 @@ class AddOrEditResource(Frame):
         self.screenshot_button.image = screenshot_image
         self.screenshot_button.grid(row=6, column=0, columnspan=4)
 
+    #Ronseal
     def clear_info(self):
         self.name_box.delete(0, END)
         self.description_box.delete("1.0", END)
@@ -400,11 +427,14 @@ class AddOrEditResource(Frame):
         chosen_items["resource"] = {}
         chosen_indices["resource"] = None
 
+    #If cancel button is clicked
     def cancel_actions(self, controller):
         self.clear_info()
         controller.show_frame(FrontPage)
 
+    #Event handler for setting things up when frame is shown
     def on_show_frame(self, event):
+        #Fills in pre-existing data
         if u'name' in chosen_items["resource"]:
             self.name_box.insert(0, chosen_items["resource"][u'name'])
         if u'description' in chosen_items["resource"]:
@@ -412,6 +442,7 @@ class AddOrEditResource(Frame):
         if u'category' in chosen_items["resource"]:
             self.subject_dropdown.set(str(chosen_items["resource"][u'category']))
 
+        #Sets up list of possible subjects
         global subject_name_list
         self.check_subject_list()
         self.subject_dropdown['values'] = subject_name_list
@@ -424,15 +455,13 @@ class AddOrEditResource(Frame):
                 if os.path.exists(im_path):
                     app_ims[im_type] = PhotoImage(file=im_path)
                 else:
+                    #If the image doesn't exist, delete reference to it, set the icon to the default
                     del chosen_items["resource"][unicode(im_type)]
                     app_ims[im_type] = PhotoImage(file=(im_subdir+"no_"+im_type+".png"))
             else:
                 app_ims[im_type] = PhotoImage(file=(im_subdir+"no_"+im_type+".png"))
 
-        #App icon label
         self.set_icon(app_ims["icon"])
-
-        #App screenshot button
         self.set_screenshot(app_ims["screenshot"])
 
         global education_levels
@@ -440,61 +469,70 @@ class AddOrEditResource(Frame):
             for level in chosen_items["resource"][u'level']:
                 self.level_checkboxes[education_levels.index(str(level))].select()
 
-    def GetPassword(self):
-        self.wait_window(PasswordDialog(self))
-
+    #NGL, this is a bit of a mess and a PITA
     def save_changes(self, controller):
         global name_lists
         global resource_list_data
         global chosen_items
         global chosen_indices
-        global file_locations
+        global other_file_location
         global other_image_dir
 
         name = self.name_box.get().lstrip()
 
+        #No name, no resource
         if name.isspace() or (not name):
             tkMessageBox.showerror("ALERT", "Cannot save resource without name")
             return
+        #Resource names must be unique
         if name in name_lists["resource"]:
             if u'name' not in chosen_items["resource"] or name != chosen_items["resource"][u'name']:
                 tkMessageBox.showerror("ALERT", "A resource with that name already exists")
                 return
 
+        #Editing/adding resources requires sudo permissions. Check for this before going on
         correct_password = False
         self.password_success = False
 
         while not correct_password:
-            self.GetPassword()
+            self.wait_window(PasswordDialog(self))
             if not self.password_success:
+                #Let users cancel out of password request, to continue editing the resource
                 return
             res = os.system('echo %s | sudo -S -v' %(self.password))
             if res == 0:
                 correct_password = True
 
+        #Add/ammend name of resource on list of resources
         if chosen_indices["resource"] is not None:
             name_lists["resource"][name_lists["resource"].index(str(chosen_items["resource"][u'name']))] = name
         else:
             name_lists["resource"].append(name)
 
+        #Keep the resource list alphabetical
         name_lists["resource"] = sorted(name_lists["resource"], key=lambda s: s.lower())
 
         chosen_items["resource"][u'name'] = unicode(name)
 
+        #Handle new images
         for im_type in ["icon", "screenshot"]:
             if self.new_image_filenames[im_type]:
                 im_location = image_dir+"/app_"+im_type+"s/"
                 if other_image_dir is not None:
                     other_im_location = other_image_dir+"/app_"+im_type+"s/"
+                #Check if there's an old image to be removed, and remove it
                 if unicode(im_type) in chosen_items["resource"] and (str(chosen_items["resource"][unicode(im_type)]) != ("no_"+im_type+".png")):
                     os.remove(im_location+str(chosen_items["resource"][unicode(im_type)]))
+                    #Remove it from the corresponding location in the other user
                     if other_image_dir is not None:
                         os.system('echo %s | sudo -S %s ' %(self.password, "rm "+other_im_location+str(chosen_items["resource"][unicode(im_type)])))
                 chosen_items["resource"][unicode(im_type)] = unicode(self.new_image_filenames[im_type])
                 if other_image_dir is not None:
+                    #Copy image to other user's image directory
                     os.system('echo %s | sudo -S %s ' %(self.password, "cp "+im_location+self.new_image_filenames[im_type]+" "+other_im_location+self.new_image_filenames[im_type]))
-                    self.new_image_filenames[im_type] = None
+                self.new_image_filenames[im_type] = None
             else:
+                #If there's no new or pre-existing image, set it to the default
                 if not unicode(im_type) in chosen_items["resource"]:
                     chosen_items["resource"][unicode(im_type)] =unicode("no_"+im_type+".png")
 
@@ -512,22 +550,29 @@ class AddOrEditResource(Frame):
         else:
             resource_list_data[u'resources'].append(chosen_items["resource"])
 
-        temp_file = open("./temp_software_list.json", "w")
-        json.dump(resource_list_data, temp_file, indent=2)
-        temp_file.close()
+        #Overwrite the resource file with the new, up-to-date info
+        resource_file = open("./software_list.json", "w")
+        json.dump(resource_list_data, resource_file, indent=2)
+        resource_file.close()
 
+        #Copy the resource file to the other location
         saved = False
-        file_results = 0
-        for file_loc in file_locations:
-            file_results += os.system('echo %s | sudo -S %s ' %(self.password, "cp ./temp_software_list.json "+file_loc))
-        if file_results == 0:
+        if other_file_location is not None:
+            file_results = os.system('echo %s | sudo -S %s ' %(self.password, "cp ./software_list.json "+other_file_location))
+            if file_results == 0:
+                saved = True
+        else:
             saved = True
+
+        #clear sudo permissions and password
+        self.password = ""
         os.system('sudo -K')
 
         if not saved:
             tkMessageBox.showerror("ALERT", "Error occurred when saving.")
             return
 
+        #Polite note to let the user know changes have been saved
         message = ""
         if chosen_indices["resource"] is not None:
             message = "Changes to " + str(chosen_items["resource"][u'name']) + " have been saved."
@@ -536,10 +581,13 @@ class AddOrEditResource(Frame):
 
         tkMessageBox.showinfo("Resource Saved", message)
 
+        #Clear the info so next time the frame is shown the old info won't still be lingering
         self.clear_info()
 
+        #Back to the front page
         controller.show_frame(FrontPage)
 
+    #Checks that the list is already populated, if not, populates it
     def check_subject_list(self):
         global subject_name_list
 
@@ -547,13 +595,17 @@ class AddOrEditResource(Frame):
             for s in resource_list_data[u'subjects']:
                 subject_name_list.append(str(s[u'name']))
 
+#Subject is different enough to resource to have its own class for adding/editing
 class AddOrEditSubject(Frame):
     def __init__(self, parent, controller):
         Frame.__init__(self, parent)
 
+        #Binds event handler from when frame is shown
         self.bind("<<ShowFrame>>", self.on_show_frame)
 
         self.new_image_filename = None
+
+        #Populating frame with various widgets
 
         Label(self, text="Name:").grid(row=0, column=0, sticky=W)
 
@@ -572,10 +624,11 @@ class AddOrEditSubject(Frame):
         self.save_button = Button(self, text="Save", command=lambda: self.save_changes(controller))
         self.save_button.grid(sticky=E, row=3, column=3)
 
-
+    #Clear data so next time frame is shown it doesn't have stale data lingering
     def clear_data(self):
         self.name_entry_box.delete(0, END)
 
+        #New image added but not saved should be removed
         if self.new_image_filename:
             os.remove(image_dir+"/interface_icons/"+self.new_image_filename)
             self.new_image_filename = None
@@ -588,10 +641,12 @@ class AddOrEditSubject(Frame):
         chosen_items["subject"] = {}
         chosen_indices["subject"] = None
 
+    #Cancelling is a two part operation
     def cancel_actions(self, controller):
         self.clear_data()
         controller.show_frame(FrontPage)
 
+    #Setting the icon image
     def set_icon(self, icon_image):
         if self.image_label is not None:
             self.image_label.grid_remove()
@@ -600,7 +655,10 @@ class AddOrEditSubject(Frame):
         self.image_label.image = icon_image
         self.image_label.grid(row=0, column=3, columnspan=3, rowspan=2)
 
+    #Setting up variables when frame is shown
     def on_show_frame(self, event):
+        #Fills in pre-existing data, if it exists
+
         if u'name' in chosen_items["subject"]:
             self.name_entry_box.insert(0, chosen_items["subject"][u'name'])
 
@@ -619,6 +677,7 @@ class AddOrEditSubject(Frame):
         #App icon label
         self.set_icon(app_im)
 
+    #Todo: there should be a way to combine this and the set_new_image function from AddOrEditResource
     def set_new_image(self):
         im_subdir = image_dir + "/interface_icons/"
         image_filetypes = (
@@ -636,13 +695,14 @@ class AddOrEditSubject(Frame):
             if self.new_image_filename == "Symbolsmall.png":
                 self.new_image_filename = os.path.splitext(self.new_image_filename)[0] + "0" + os.path.splitext(self.new_image_filename)[1]
 
+            #Todo: again, this could be replaced using os.system
             shutil.copyfile(image_filepath, (im_subdir+self.new_image_filename))
             new_image = PhotoImage(file=(im_subdir+self.new_image_filename))
             self.set_icon(new_image)
 
-    def GetPassword(self):
-        self.wait_window(PasswordDialog(self))
-
+    #Less bad than the other one, still not pretty
+    #Could maybe be combined with other save function?
+    #Todo: if subject name changes, update resources with that subject as their category to the new subject name
     def save_changes(self, controller):
         global name_lists
         global resource_list_data
@@ -652,25 +712,29 @@ class AddOrEditSubject(Frame):
 
         name = self.name_entry_box.get().lstrip().title()
 
+        #No name, no subject
         if name.isspace() or (not name):
             tkMessageBox.showerror("ALERT", "Cannot save subject without name")
             return
+        #Subjects must be unique
         if name in name_lists["subject"]:
             if u'name' not in chosen_items["subject"] or name != chosen_items["subject"][u'name']:
                 tkMessageBox.showerror("ALERT", "A subject with that name already exists")
                 return
 
+        #Going to be saving changes, need sudo permissions
         correct_password = False
         self.password_success = False
 
         while not correct_password:
-            self.GetPassword()
+            self.wait_window(PasswordDialog(self))
             if not self.password_success:
                 return
             res = os.system('echo %s | sudo -S -v' %(self.password))
             if res == 0:
                 correct_password = True
 
+        #Update list of subjects to reflect changes
         if chosen_indices["subject"] is not None:
             name_lists["subject"][name_lists["subject"].index(str(chosen_items["subject"][u'name']))] = name
         else:
@@ -680,6 +744,7 @@ class AddOrEditSubject(Frame):
 
         chosen_items["subject"][u'name'] = unicode(name)
 
+        #Set new image and copy to other user's directory, as well as deleting obselete images
         if self.new_image_filename:
             im_location = image_dir+"/interface_icons/"
             if other_image_dir is not None:
@@ -692,6 +757,7 @@ class AddOrEditSubject(Frame):
             if other_image_dir is not None:
                 os.system('echo %s | sudo -S %s ' %(self.password, "cp "+im_location+self.new_image_filename+" "+other_im_location+self.new_image_filename))
             self.new_image_filename = None
+        #If there's no image, old or new, set the image to the default
         else:
             if not u'icon' in chosen_items["subject"]:
                 chosen_items["subject"][u'icon'] =unicode("Symbolsmall.png")
@@ -701,22 +767,29 @@ class AddOrEditSubject(Frame):
         else:
             resource_list_data[u'subjects'].append(chosen_items["subject"])
 
-        temp_file = open("./temp_software_list.json", "w")
-        json.dump(resource_list_data, temp_file, indent=2)
-        temp_file.close()
+        #Overwrite reosurce file with new info
+        resource_file = open("./software_list.json", "w")
+        json.dump(resource_list_data, resource_file, indent=2)
+        resource_file.close()
 
+        #Copy to the other user's location
         saved = False
-        file_results = 0
-        for file_loc in file_locations:
-            file_results += os.system('echo %s | sudo -S %s ' %(self.password, "cp ./temp_software_list.json "+file_loc))
-        if file_results == 0:
+        if other_file_location is not None:
+            file_results = os.system('echo %s | sudo -S %s ' %(self.password, "cp ./software_list.json "+other_file_location))
+            if file_results == 0:
+                saved = True
+        else:
             saved = True
+
+        #Clear sudo permissions and password
+        self.password = ""
         os.system('sudo -K')
 
         if not saved:
             tkMessageBox.showerror("ALERT", "Error occurred when saving.")
             return
 
+        #Let the user know the changes have been saved
         message = ""
         if chosen_indices["subject"] is not None:
             message = "Changes to " + str(chosen_items["subject"][u'name']) + " have been saved."
@@ -725,20 +798,18 @@ class AddOrEditSubject(Frame):
 
         tkMessageBox.showinfo("Subject Saved", message)
 
+        #Clean up, clean up, everybody everywhere
+        #Clean up, clean up, everybody do your share
         self.clear_data()
 
         controller.show_frame(FrontPage)
 
 
 
-
-
 root = UpdaterApp()
 
+#This may no longer be necessary, more stuff used to be done in here
 def on_closing():
-    if os.path.exists("./temp_software_list.json"):
-        os.remove("./temp_software_list.json")
-    print("Closed!")
     root.destroy()
 
 root.wm_protocol("WM_DELETE_WINDOW", on_closing)
